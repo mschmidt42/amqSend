@@ -3,12 +3,51 @@
  */
 package oc.msm.amq;
 
+import org.apache.activemq.ActiveMQConnection;
+import org.apache.activemq.ActiveMQConnectionFactory;
+
+import javax.jms.*;
+import java.lang.*;
+
 public class App {
     public String getGreeting() {
         return "Hello World!";
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws JMSException {
         System.out.println(new App().getGreeting());
+
+		var user = ActiveMQConnection.DEFAULT_USER;
+		var password = ActiveMQConnection.DEFAULT_PASSWORD;
+
+		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory("tcp://mq:61616");
+		Connection connection = null;
+
+		try {
+			connection = connectionFactory.createConnection();
+			connection.start();
+
+			Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+			Destination destination = session.createQueue("bpasreceiveQueue");
+
+			MessageProducer producer = session.createProducer(destination);
+			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
+
+			String text = "First Test Message";
+			TextMessage message = session.createTextMessage();
+			message.setStringProperty("JMSType",
+					"com.adcubum.syrius.corporg.bpm.bpas.bl.api.notification.v1.BusinessProcessFinishedEventNotification");
+			message.setText(text);
+			producer.send(message);
+
+		} catch (JMSException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally {
+			if (connection != null) {
+				connection.close();
+			}
+		}
+
     }
 }
