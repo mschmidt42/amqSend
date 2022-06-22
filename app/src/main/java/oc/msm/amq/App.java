@@ -9,13 +9,17 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 import javax.jms.*;
 import java.lang.*;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class App {
+	private static Logger LOGGER = LoggerFactory.getLogger(App.class);
+
     public String getGreeting() {
         return "Hello World!";
     }
 
-    public static void main(String[] args) throws JMSException {
-        System.out.println(new App().getGreeting());
+    public static void main(String[] args) {
 
 		var user = ActiveMQConnection.DEFAULT_USER;
 		var password = ActiveMQConnection.DEFAULT_PASSWORD;
@@ -24,6 +28,7 @@ public class App {
 		Connection connection = null;
 
 		try {
+			LOGGER.info("connecting ...");
 			connection = connectionFactory.createConnection();
 			connection.start();
 
@@ -33,19 +38,25 @@ public class App {
 			MessageProducer producer = session.createProducer(destination);
 			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
+			LOGGER.info("create message ...");
 			String text = "First Test Message";
 			TextMessage message = session.createTextMessage();
 			message.setStringProperty("JMSType",
 					"com.adcubum.syrius.corporg.bpm.bpas.bl.api.notification.v1.BusinessProcessFinishedEventNotification");
+
+			LOGGER.info("sending message ...");
 			message.setText(text);
 			producer.send(message);
 
 		} catch (JMSException e) {
-			// TODO Auto-generated catch block
+			LOGGER.error("ERROR: {}", e.getMessage());
 			e.printStackTrace();
 		} finally {
-			if (connection != null) {
+			try {
+				LOGGER.info("closing connection ...");
 				connection.close();
+			} catch (JMSException e) {
+				LOGGER.error("Error closing connection: {}", e.getMessage());
 			}
 		}
 
