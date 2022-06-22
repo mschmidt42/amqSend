@@ -3,3 +3,16 @@
 
 # Ignore Gradle build output directory
 build
+
+# eclipse
+.classpath
+.project
+.settings/
+app/.classpath
+app/.project
+app/.settings/
+app/bin/
+
+# vim
+*.swp
+*.swo
