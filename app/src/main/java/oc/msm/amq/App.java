@@ -8,23 +8,56 @@ import org.apache.activemq.ActiveMQConnectionFactory;
 
 import javax.jms.*;
 import java.lang.*;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class App {
+import java.util.concurrent.Callable;
+import picocli.CommandLine;
+import picocli.CommandLine.*;
+
+@Command(name = "amqSend", mixinStandardHelpOptions = true, version = "amqSend 0.4",
+	description = "Sends a message to ActiveMQ")
+public class App implements Callable<Integer> {
 	private static Logger LOGGER = LoggerFactory.getLogger(App.class);
+
+    @Parameters(index = "0", description = "A (JSOM) file containing the date to send as text")
+    private Path file;
+
+    @Option(names = {"-c", "--connection"}, description = "the conection to use. Default: \"tcp://localhost:61616\"")
+    private String connectionUrl = "tcp://localhost:61616";
+
+    @Option(names = {"-q", "--queue"}, description = "The destinantion queue.")
+    private String queueName;
+
+    @Option(names = {"-h", "--header-name"}, description = "the header name to send. Default: \"JMSType\"")
+    private String headerName = "JMSType";
+
+    @Option(names = {"-v", "--header-value"}, description = "the header value to send. Default: \"unknown\"")
+    private String headerValue = "unknown";
+
+    @Option(names = {"-r", "--remove-nl"}, description = "remove \\n, \\r and \\t characters.")
+    private boolean removeNewline = false;
+
 
     public String getGreeting() {
         return "Hello World!";
     }
 
-    public static void main(String[] args) {
+    public static void main(String... args) {
+    	int exitCode = new CommandLine(new App()).execute(args);
+        System.exit(exitCode);
+    }
 
+    @Override
+    public Integer call() throws Exception {
 		var user = ActiveMQConnection.DEFAULT_USER;
 		var password = ActiveMQConnection.DEFAULT_PASSWORD;
 
-		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory("tcp://mq:61616");
+		ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(connectionUrl);
 		Connection connection = null;
 
 		try {
@@ -33,16 +66,18 @@ public class App {
 			connection.start();
 
 			Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-			Destination destination = session.createQueue("bpasreceiveQueue");
+			Destination destination = session.createQueue(queueName);
 
 			MessageProducer producer = session.createProducer(destination);
 			producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
 			LOGGER.info("create message ...");
-			String text = "First Test Message";
+			String text = Files.readString(file);
+			if(removeNewline) {
+				text = text.replaceAll("[\n\r\t]", "");
+			}
 			TextMessage message = session.createTextMessage();
-			message.setStringProperty("JMSType",
-					"com.adcubum.syrius.corporg.bpm.bpas.bl.api.notification.v1.BusinessProcessFinishedEventNotification");
+			message.setStringProperty(headerName, headerValue);
 
 			LOGGER.info("sending message ...");
 			message.setText(text);
@@ -50,7 +85,7 @@ public class App {
 
 		} catch (JMSException e) {
 			LOGGER.error("ERROR: {}", e.getMessage());
-			e.printStackTrace();
+			// e.printStackTrace();
 		} finally {
 			try {
 				LOGGER.info("closing connection ...");
@@ -59,6 +94,8 @@ public class App {
 				LOGGER.error("Error closing connection: {}", e.getMessage());
 			}
 		}
+		return 0;
 
     }
+
 }
